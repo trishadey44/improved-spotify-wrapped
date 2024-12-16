@@ -5,8 +5,8 @@ function handleFileUpload(event) {
     if (!file) return;
 
     Papa.parse(file, {
-        header: true, // Use the first row as headers
-        skipEmptyLines: true, // Ignore empty rows
+        header: true,
+        skipEmptyLines: true,
         complete: function (results) {
             processCSVData(results.data);
         },
@@ -16,68 +16,54 @@ function handleFileUpload(event) {
     });
 }
 
-function processCSVData(data) {
-    // Show the stats section
-    document.getElementById('stats').style.display = 'block'; // Or remove the "hidden" class
-    // document.getElementById('stats').classList.remove('hidden');
+async function processCSVData(data) {
+    document.getElementById('stats').style.display = 'block';
 
-    // Initialize variables for calculations
     let totalSongs = 0;
     let totalMilliseconds = 0;
-    let totalPodcastMilliseconds = 0;
-    const songCounts = {};
     const artistCounts = {};
-    const podcastCounts = {};
+    const genreCounts = {};
 
-    data.forEach(row => {
+    for (const row of data) {
         const track = row['Track Name']?.trim();
         const artist = row['Artist Name']?.trim();
         const duration = parseInt(row['Milliseconds Played']?.trim() || '0', 10);
-        const podcastName = row['Podcast Name']?.trim();
-        const podcastEpisode = row['Podcast Episode Name']?.trim();
 
-        // Song stats
-        if (track && artist && duration && !podcastName) {
+        if (track && artist && duration) {
             totalSongs++;
             totalMilliseconds += duration;
-
-            // Count occurrences of each song and artist
-            songCounts[track] = (songCounts[track] || 0) + 1;
             artistCounts[artist] = (artistCounts[artist] || 0) + 1;
+
+            // Fetch genres for the artist
+            const genres = await fetchGenresFromAPI(artist);
+            genres.forEach(genre => {
+                genreCounts[genre] = (genreCounts[genre] || 0) + 1;
+            });
         }
-
-        // Podcast stats
-        if (podcastName && podcastEpisode && duration) {
-            totalPodcastMilliseconds += duration;
-
-            // Count occurrences of each podcast
-            podcastCounts[podcastName] = (podcastCounts[podcastName] || 0) + 1;
-        }
-    });
-
-    // Helper function to get top 5 items
-    function getTopFiveCounts(counts) {
-        return Object.entries(counts)
-            .sort((a, b) => b[1] - a[1]) // Sort by count in descending order
-            .slice(0, 5) // Get top 5 entries
-            .map(([name, count]) => `${name} (${count} plays)`); // Format output
     }
 
-    // Calculate top 5 songs and artists
-    const topSongs = getTopFiveCounts(songCounts);
-    const topArtists = getTopFiveCounts(artistCounts);
+    // Calculate top 5 genres
+    const topGenres = Object.entries(genreCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([genre, count]) => `${genre} (${count} plays)`);
 
-    // Determine most played podcast
-    const mostPlayedPodcast = Object.keys(podcastCounts).reduce((a, b) => (podcastCounts[a] > podcastCounts[b] ? a : b), 'N/A');
-
-    // Update stats on the webpage
-    // Song stats
+    // Update stats
     document.getElementById('totalSongs').textContent = totalSongs;
-    document.getElementById('totalMinutes').textContent = Math.round(totalMilliseconds / 60000); // Convert ms to minutes
-    document.getElementById('topSongs').innerHTML = topSongs.map(song => `<li>${song}</li>`).join('');
-    document.getElementById('topArtists').innerHTML = topArtists.map(artist => `<li>${artist}</li>`).join('');
+    document.getElementById('totalMinutes').textContent = Math.round(totalMilliseconds / 60000);
+    document.getElementById('topGenres').innerHTML = topGenres.map(genre => `<li>${genre}</li>`).join('');
+}
 
-    // Podcast stats
-    document.getElementById('mostPlayedPodcast').textContent = mostPlayedPodcast;
-    document.getElementById('totalPodcastMinutes').textContent = Math.round(totalPodcastMilliseconds / 60000); // Convert ms to minutes
+async function fetchGenresFromAPI(artist) {
+    try {
+        const response = await fetch(`http://localhost:3000/genres?artist=${encodeURIComponent(artist)}`);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        return data.genres || []; // Ensure that genres is returned even if empty
+    } catch (error) {
+        console.error('Error fetching genres:', error);
+        return []; // Return an empty array in case of error
+    }
 }

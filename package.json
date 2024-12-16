@@ -1,0 +1,17 @@
+{
+  "name": "spotify-stats",
+  "version": "1.0.0",
+  "description": "Spotify 2024 Wrapped stats",
+  "main": "server.js",
+  "type": "module",
+  "dependencies": {
+    "axios": "^1.7.9",
+    "express": "^4.21.2",
+    "node-fetch": "^3.3.1",
+    "cors": "^2.8.5",
+    "papaparse": "^5.3.2"
+  },
+  "scripts": {
+    "start": "node server.js"
+  }
+}
