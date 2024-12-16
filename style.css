@@ -11,16 +11,30 @@ body {
     justify-content: start;
 }
 
+.container {
+    width: 100%;
+    max-width: 1200px; /* Limits the container width */
+    margin: 0 auto; /* Centers the container */
+    padding: 20px;
+    text-align: center;
+}
+
 h1 {
     text-align: center;
     margin-top: 20px;
-    font-size: 3em;
-    color: #1ed760;
-    text-shadow: 2px 2px #000;
+    font-size: 4em;
+    color: #000;
+    text-shadow: 2px 2px #1dE954;
 }
 
-h2, h3 {
-    font-size: 1.8em;
+h2 {
+    font-size: 2em;
+    color: #fff;
+    margin-bottom: 10px;
+}
+
+h3 {
+    font-size: 1.6em;
     color: #fff;
     margin-bottom: 10px;
 }
@@ -33,6 +47,9 @@ ul {
 li {
     margin: 5px 0;
     font-size: 16px;
+    text-overflow: ellipsis; /* Applies ellipsis */
+    overflow: hidden;
+    white-space: nowrap; /* Ensures the text doesn't wrap */
 }
 
 #fileInput {
@@ -56,17 +73,31 @@ li {
 
 .stats-section {
     display: flex;
-    justify-content: space-between;
-    width: 90%;
+    flex-direction: column; /* Stack sections vertically */
+    align-items: center; /* Center content horizontally */
+    gap: 20px; /* Space between the sections */
+    width: 100%; /* Adjust the width of the container */
     margin-top: 20px;
-    gap: 20px;
 }
 
 .stats-music, .stats-podcast {
-    flex: 1;
+    width: 50%; /* Set the width to around half the screen */
     background: rgba(0, 0, 0, 0.6);
     padding: 20px;
     border-radius: 10px;
     box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.5);
-    min-width: 45%;
+    min-width: 300px; /* Prevent the sections from getting too narrow */
+}
+
+.stats-music h3, .stats-podcast h3 {
+    margin-top: 10px;
+}
+
+.stats-music h2, .stats-podcast h2 {
+    font-size: 2.2em; /* Adjust size if needed */
+    margin-bottom: 20px; /* Optional margin for spacing */
+}
+
+.stats-music ul, .stats-podcast ul {
+    margin-left: 20px;
 }

@@ -21,18 +21,23 @@ async function processCSVData(data) {
 
     let totalSongs = 0;
     let totalMilliseconds = 0;
-    const artistCounts = {};
+    let totalPodcastMinutes = 0;
+    const songCounts = {};
     const genreCounts = {};
+    const podcastCounts = {};
+    const artistCounts = {};
 
     for (const row of data) {
         const track = row['Track Name']?.trim();
         const artist = row['Artist Name']?.trim();
         const duration = parseInt(row['Milliseconds Played']?.trim() || '0', 10);
+        const podcast = row['Podcast Name']?.trim(); // Assuming podcasts are identified by this field
 
         if (track && artist && duration) {
             totalSongs++;
             totalMilliseconds += duration;
             artistCounts[artist] = (artistCounts[artist] || 0) + 1;
+            songCounts[track] = (songCounts[track] || 0) + 1;
 
             // Fetch genres for the artist
             const genres = await fetchGenresFromAPI(artist);
@@ -40,7 +45,18 @@ async function processCSVData(data) {
                 genreCounts[genre] = (genreCounts[genre] || 0) + 1;
             });
         }
+
+        if (podcast && duration) {
+            totalPodcastMinutes += Math.round(duration / 60000);
+            podcastCounts[podcast] = (podcastCounts[podcast] || 0) + 1;
+        }
     }
+
+    // Calculate top 5 songs
+    const topSongs = Object.entries(songCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([song, count]) => `${song} (${count} plays)`);
 
     // Calculate top 5 genres
     const topGenres = Object.entries(genreCounts)
@@ -48,10 +64,20 @@ async function processCSVData(data) {
         .slice(0, 5)
         .map(([genre, count]) => `${genre} (${count} plays)`);
 
+    // Calculate top 5 podcasts
+    const topPodcasts = Object.entries(podcastCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([podcast, count]) => `${podcast} (${count} plays)`);
+
     // Update stats
     document.getElementById('totalSongs').textContent = totalSongs;
     document.getElementById('totalMinutes').textContent = Math.round(totalMilliseconds / 60000);
+    document.getElementById('topSongs').innerHTML = topSongs.map(song => `<li>${song}</li>`).join('');
     document.getElementById('topGenres').innerHTML = topGenres.map(genre => `<li>${genre}</li>`).join('');
+    document.getElementById('mostPlayedPodcast').textContent = Object.keys(podcastCounts)[0] || 'N/A';
+    document.getElementById('totalPodcastMinutes').textContent = totalPodcastMinutes;
+    document.getElementById('topPodcasts').innerHTML = topPodcasts.map(podcast => `<li>${podcast}</li>`).join('');
 }
 
 async function fetchGenresFromAPI(artist) {
