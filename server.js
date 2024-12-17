@@ -1,6 +1,8 @@
 import fetch from 'node-fetch';
+import axios from 'axios';
 import express from 'express';
 import cors from 'cors';
+import { storeGenresInDB, getGenresFromDB } from './db.js';  // Import the database functions
 
 const app = express();
 const port = 3000;
@@ -34,22 +36,51 @@ app.use(async (req, res, next) => {
 
 app.use(cors());
 
-async function fetchWithRateLimit(url, options) {
-    let retries = 3; // Number of retries before giving up
-    while (retries > 0) {
+const MAX_RETRIES = 5;
+const RETRY_DELAY = 2000;
+
+// Retry logic with better error handling
+async function fetchWithRetry(url, options, retries = MAX_RETRIES) {
+    try {
         const response = await fetch(url, options);
-        
-        if (response.status === 429) { // Too many requests (rate limit)
-            const retryAfter = response.headers.get('Retry-After');
-            console.log(`Rate limit hit. Retrying after ${retryAfter} seconds...`);
-            await new Promise(resolve => setTimeout(resolve, retryAfter * 1000)); // Wait before retrying
-        } else {
-            return response;
+
+        // Handle rate-limited responses (status 429)
+        if (response.status === 429) {
+            console.log('Rate-limited by Spotify, retrying...');
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+            return fetchWithRetry(url, options, retries - 1);
         }
-        retries--;
+
+        // Handle non-OK responses
+        if (!response.ok) {
+            throw new Error(`Request failed: ${response.statusText}`);
+        }
+
+        return response;  // Return the response if no errors
+
+    } catch (error) {
+        // Log the full error object for better diagnostics
+        console.error('Error details:', error);
+
+        // Handle "Premature close" error specifically
+        if (error.code === 'ERR_STREAM_PREMATURE_CLOSE' && retries > 0) {
+            console.log(`Premature close error, retrying... attempts remaining: ${retries}`);
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));  // Wait before retry
+            return fetchWithRetry(url, options, retries - 1);
+        }
+
+        // Handle any other errors and retry
+        if (retries > 0) {
+            console.log(`Error encountered: ${error.message}. Retrying... attempts remaining: ${retries}`);
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));  // Wait before retry
+            return fetchWithRetry(url, options, retries - 1);
+        } else {
+            console.error('Max retries reached. Error:', error);
+            throw new Error(`Request failed after multiple retries: ${error.message}`);
+        }
     }
-    return null; // If we hit the retry limit, return null
 }
+
 
 // Endpoint to fetch genres for an artist
 app.get('/genres', async (req, res) => {
@@ -57,57 +88,57 @@ app.get('/genres', async (req, res) => {
     if (!artist) return res.status(400).send({ error: 'Missing artist parameter' });
 
     try {
-        // Check if the genres are already in the cache
-        if (genreCache[artist]) {
-            console.log(`Genres for ${artist} found in cache`);
-            return res.json({ genres: genreCache[artist] });
-        }
+        // Step 1: Check if the genres are already in the database
+        getGenresFromDB(artist, async (cachedGenres) => {
+            if (cachedGenres) {
+                console.log(`Genres for ${artist} found in database`);
+                return res.json({ genres: cachedGenres });
+            } else {
+                // Step 2: If not in DB, fetch from Spotify API
+                console.log(`Fetching genres for artist: ${artist}`);
 
-        console.log(`Fetching genres for artist: ${artist}`);
+                // Search for the artist by name to get the Spotify ID
+                const searchResponse = await fetchWithRetry(`https://api.spotify.com/v1/search?q=${encodeURIComponent(artist)}&type=artist&limit=1`, {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
 
-        // Step 1: Search for the artist by name to get the Spotify ID
-        const searchResponse = await fetchWithRateLimit(`https://api.spotify.com/v1/search?q=${encodeURIComponent(artist)}&type=artist&limit=1`, {
-            headers: {
-                Authorization: `Bearer ${token}`,
-            },
+                if (!searchResponse.ok) {
+                    throw new Error(`Request failed: ${searchResponse.statusText}`);
+                }
+
+                const searchData = await searchResponse.json();
+
+                // Check if the artist exists in the response
+                if (!searchData.artists || searchData.artists.items.length === 0) {
+                    console.error('Error searching for artist:', searchData);
+                    return res.status(404).json({ error: 'Artist not found' });
+                }
+
+                // Now proceed with the artist ID and genres extraction
+                const artistId = searchData.artists.items[0].id;
+
+                // Get genres from the artist's details using the Spotify artist ID
+                const artistResponse = await fetchWithRetry(`https://api.spotify.com/v1/artists/${artistId}`, {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
+
+                const artistData = await artistResponse.json();
+                const genres = artistData.genres;
+
+                // Store the fetched genres in the database
+                storeGenresInDB(artist, genres);
+
+                console.log('Genres fetched and stored:', genres);
+                return res.json({ genres });
+            }
         });
-
-        if (!searchResponse) {
-            return res.status(500).json({ error: 'Too many requests. Please try again later.' });
-        }
-
-        const searchData = await searchResponse.json();
-        
-        if (!searchResponse.ok || !searchData.artists || searchData.artists.items.length === 0) {
-            console.error('Error searching for artist:', searchData);
-            return res.status(404).json({ error: 'Artist not found' });
-        }
-
-        const artistId = searchData.artists.items[0].id;
-        console.log(`Found artist ID: ${artistId}`);
-
-        // Step 2: Get genres from the artist's details using the Spotify artist ID
-        const artistResponse = await fetchWithRateLimit(`https://api.spotify.com/v1/artists/${artistId}`, {
-            headers: {
-                Authorization: `Bearer ${token}`,
-            },
-        });
-
-        if (!artistResponse) {
-            return res.status(500).json({ error: 'Too many requests. Please try again later.' });
-        }
-
-        const artistData = await artistResponse.json();
-        const genres = artistData.genres;
-        console.log('Genres fetched:', genres); // Log the data from Spotify API
-
-        // Store the fetched genres in the cache
-        genreCache[artist] = genres;
-
-        res.json({ genres }); // Send back the genres for the artist
     } catch (error) {
-        console.error('Error:', error);
-        res.status(500).json({ error: 'Error fetching data', details: error.message });
+        console.error('Error fetching genres:', error);
+        return res.status(500).json({ error: 'An error occurred while fetching genres' });
     }
 });
 
