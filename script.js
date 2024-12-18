@@ -26,12 +26,14 @@ async function processCSVData(data) {
     const genreCounts = {};
     const podcastCounts = {};
     const artistCounts = {};
+    const albumCounts = {};
 
     for (const row of data) {
         const track = row['Track Name']?.trim();
         const artist = row['Artist Name']?.trim();
         const duration = parseInt(row['Milliseconds Played']?.trim() || '0', 10);
         const podcast = row['Podcast Name']?.trim(); // Assuming podcasts are identified by this field
+        const album = row['Album Name']?.trim(); 
 
         if (track && artist && duration) {
             totalSongs++;
@@ -44,6 +46,11 @@ async function processCSVData(data) {
             genres.forEach(genre => {
                 genreCounts[genre] = (genreCounts[genre] || 0) + 1;
             });
+
+            if (album) {
+                albumCounts[album] = (albumCounts[album] || 0) + 1;
+            }
+            
         }
 
         if (podcast && duration) {
@@ -70,11 +77,18 @@ async function processCSVData(data) {
         .slice(0, 5)
         .map(([podcast, count]) => `${podcast} (${count} plays)`);
 
+    // Calculate top 5 albums
+    const topAlbums = Object.entries(albumCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([album, count]) => `${album} (${count} plays)`);
+
     // Update stats
     document.getElementById('totalSongs').textContent = totalSongs;
     document.getElementById('totalMinutes').textContent = Math.round(totalMilliseconds / 60000);
     document.getElementById('topSongs').innerHTML = topSongs.map(song => `<li>${song}</li>`).join('');
     document.getElementById('topGenres').innerHTML = topGenres.map(genre => `<li>${genre}</li>`).join('');
+    document.getElementById('topAlbums').innerHTML = topAlbums.map(album => `<li>${album}</li>`).join('');
     document.getElementById('mostPlayedPodcast').textContent = Object.keys(podcastCounts)[0] || 'N/A';
     document.getElementById('totalPodcastMinutes').textContent = totalPodcastMinutes;
     document.getElementById('topPodcasts').innerHTML = topPodcasts.map(podcast => `<li>${podcast}</li>`).join('');
