@@ -30,6 +30,9 @@ async function processCSVData(data) {
     const songsListenedToBefore = new Set(); // Track songs already listened to
     let newSongs = 0;
     const artistsToFetchGenres = new Set(); // Collect artists for batch genre requests
+    const uniqueArtists = new Set(); // Track unique artists
+    const uniqueAlbums = new Set(); // Track unique albums
+    const uniqueGenres = new Set(); // Track unique genres
 
     for (const row of data) {
         const track = row['Track Name']?.trim();
@@ -53,7 +56,10 @@ async function processCSVData(data) {
             // Collect artists for batch genre fetch
             artistsToFetchGenres.add(artist);
 
+            // Track unique artists and albums
+            uniqueArtists.add(artist);
             if (album) {
+                uniqueAlbums.add(album);
                 albumCounts[album] = (albumCounts[album] || 0) + 1;
             }
         }
@@ -68,11 +74,12 @@ async function processCSVData(data) {
      const genreData = await fetchGenresForArtists(Array.from(artistsToFetchGenres));
 
      // Process the genres and update counts
-     genreData.forEach(({ artist, genres }) => {
-         genres.forEach(genre => {
-             genreCounts[genre] = (genreCounts[genre] || 0) + 1;
-         });
-     });
+    genreData.forEach(({ artist, genres }) => {
+        genres.forEach(genre => {
+            genreCounts[genre] = (genreCounts[genre] || 0) + 1;
+            uniqueGenres.add(genre); // Track unique genres
+        });
+    });
 
     // Calculate new songs percentage
     const newSongsPercentage = totalSongs > 0 ? (newSongs / totalSongs) * 100 : 0;
@@ -111,6 +118,9 @@ async function processCSVData(data) {
     document.getElementById('totalPodcastMinutes').textContent = totalPodcastMinutes;
     document.getElementById('topPodcasts').innerHTML = topPodcasts.map(podcast => `<li>${podcast}</li>`).join('');
     document.getElementById('newSongsPercentage').textContent = `${newSongsPercentage.toFixed(2)}%`;
+    document.getElementById('uniqueArtists').textContent = uniqueArtists.size;
+    document.getElementById('uniqueAlbums').textContent = uniqueAlbums.size;
+    document.getElementById('uniqueGenres').textContent = uniqueGenres.size;
 }
 
 async function fetchGenresFromAPI(artist) {
