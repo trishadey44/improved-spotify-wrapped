@@ -29,6 +29,7 @@ async function processCSVData(data) {
     const albumCounts = {};
     const songsListenedToBefore = new Set(); // Track songs already listened to
     let newSongs = 0;
+    const artistsToFetchGenres = new Set(); // Collect artists for batch genre requests
 
     for (const row of data) {
         const track = row['Track Name']?.trim();
@@ -49,16 +50,12 @@ async function processCSVData(data) {
                 songsListenedToBefore.add(track);
             }
 
-            // Fetch genres for the artist
-            const genres = await fetchGenresFromAPI(artist);
-            genres.forEach(genre => {
-                genreCounts[genre] = (genreCounts[genre] || 0) + 1;
-            });
+            // Collect artists for batch genre fetch
+            artistsToFetchGenres.add(artist);
 
             if (album) {
                 albumCounts[album] = (albumCounts[album] || 0) + 1;
             }
-            
         }
 
         if (podcast && duration) {
@@ -66,6 +63,16 @@ async function processCSVData(data) {
             podcastCounts[podcast] = (podcastCounts[podcast] || 0) + 1;
         }
     }
+
+     // Fetch genres in batch
+     const genreData = await fetchGenresForArtists(Array.from(artistsToFetchGenres));
+
+     // Process the genres and update counts
+     genreData.forEach(({ artist, genres }) => {
+         genres.forEach(genre => {
+             genreCounts[genre] = (genreCounts[genre] || 0) + 1;
+         });
+     });
 
     // Calculate new songs percentage
     const newSongsPercentage = totalSongs > 0 ? (newSongs / totalSongs) * 100 : 0;
@@ -113,9 +120,16 @@ async function fetchGenresFromAPI(artist) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
-        return data.genres || []; // Ensure that genres is returned even if empty
+        return data.genres || []; // Ensure that genres are returned even if empty
     } catch (error) {
         console.error('Error fetching genres:', error);
         return []; // Return an empty array in case of error
     }
+}
+
+// Fetch genres for a list of artists
+async function fetchGenresForArtists(artists) {
+    const fetchPromises = artists.map(artist => fetchGenresFromAPI(artist));
+    const genresArray = await Promise.all(fetchPromises);
+    return artists.map((artist, index) => ({ artist, genres: genresArray[index] }));
 }
