@@ -80,7 +80,7 @@ li {
     margin-top: 20px;
 }
 
-.stats-music, .stats-podcast {
+.stats-music, .stats-podcast, .stats-general {
     width: 50%; /* Set the width to around half the screen */
     background: rgba(0, 0, 0, 0.6);
     padding: 20px;
@@ -89,15 +89,15 @@ li {
     min-width: 300px; /* Prevent the sections from getting too narrow */
 }
 
-.stats-music h3, .stats-podcast h3 {
+.stats-music h3, .stats-podcast h3, .stats-general h3 {
     margin-top: 10px;
 }
 
-.stats-music h2, .stats-podcast h2 {
+.stats-music h2, .stats-podcast h2, .stats-general h2 {
     font-size: 2.2em; /* Adjust size if needed */
     margin-bottom: 20px; /* Optional margin for spacing */
 }
 
-.stats-music ul, .stats-podcast ul {
+.stats-music ul, .stats-podcast ul, .stats-general ul {
     margin-left: 20px;
 }

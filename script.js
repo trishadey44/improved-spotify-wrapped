@@ -27,6 +27,8 @@ async function processCSVData(data) {
     const podcastCounts = {};
     const artistCounts = {};
     const albumCounts = {};
+    const songsListenedToBefore = new Set(); // Track songs already listened to
+    let newSongs = 0;
 
     for (const row of data) {
         const track = row['Track Name']?.trim();
@@ -40,6 +42,12 @@ async function processCSVData(data) {
             totalMilliseconds += duration;
             artistCounts[artist] = (artistCounts[artist] || 0) + 1;
             songCounts[track] = (songCounts[track] || 0) + 1;
+
+            // Track if the song is new
+            if (!songsListenedToBefore.has(track)) {
+                newSongs++;
+                songsListenedToBefore.add(track);
+            }
 
             // Fetch genres for the artist
             const genres = await fetchGenresFromAPI(artist);
@@ -58,6 +66,9 @@ async function processCSVData(data) {
             podcastCounts[podcast] = (podcastCounts[podcast] || 0) + 1;
         }
     }
+
+    // Calculate new songs percentage
+    const newSongsPercentage = totalSongs > 0 ? (newSongs / totalSongs) * 100 : 0;
 
     // Calculate top 5 songs
     const topSongs = Object.entries(songCounts)
@@ -92,6 +103,7 @@ async function processCSVData(data) {
     document.getElementById('mostPlayedPodcast').textContent = Object.keys(podcastCounts)[0] || 'N/A';
     document.getElementById('totalPodcastMinutes').textContent = totalPodcastMinutes;
     document.getElementById('topPodcasts').innerHTML = topPodcasts.map(podcast => `<li>${podcast}</li>`).join('');
+    document.getElementById('newSongsPercentage').textContent = `${newSongsPercentage.toFixed(2)}%`;
 }
 
 async function fetchGenresFromAPI(artist) {
